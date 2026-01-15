@@ -109,7 +109,6 @@ ORDER BY scheduled_time DESC;
 
 
 --Lambda code
-
 import json
 import datetime, decimal
 import logging
@@ -159,3 +158,41 @@ def lambda_handler(event, context):
             default=default_json_transform
         )
     }
+
+
+--API gateway resource policy
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "execute-api:Invoke",
+      "Resource": "arn:aws:execute-api:340650176156:*/*/*/*",
+      "Condition": {
+        "StringNotEquals": {
+          "aws:sourceVpc": [
+            "vpc-0cb0b6f8542ce1fd4",
+            "vpc-026e332e6eb86f6de"
+          ]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:sts::340650176156:assumed-role/RQC_snowflake_external_role/snowflake"
+      },
+      "Action": "execute-api:Invoke",
+      "Resource": "arn:aws:execute-api:340650176156:*/*/*/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:sourceVpc": [
+            "vpc-0cb0b6f8542ce1fd4",
+            "vpc-026e332e6eb86f6de"
+          ]
+        }
+      }
+    }
+  ]
+}
