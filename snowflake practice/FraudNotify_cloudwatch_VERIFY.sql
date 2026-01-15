@@ -104,3 +104,58 @@ FROM TABLE(
   )
 )
 ORDER BY scheduled_time DESC;
+
+
+
+
+--Lambda code
+
+import json
+import datetime, decimal
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+def default_json_transform(obj):
+    if isinstance(obj, decimal.Decimal):
+        return str(obj)
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    raise TypeError
+
+def lambda_handler(event, context):
+    response_rows = []
+
+    # Snowflake External Function は body に payload を載せる
+    body = json.loads(event.get("body", "{}"))
+
+    for row in body.get("data", []):
+        row_number = row[0]
+        payload = row[1]   # ← OBJECT_CONSTRUCT した中身
+
+        # CloudWatch Logs に構造化ログとして出力
+        logger.info(
+            json.dumps(
+                {
+                    "source": "snowflake",
+                    "table": payload.get("table"),
+                    "event_type": payload.get("event_type"),
+                    "data": payload.get("data"),
+                    "ingested_at": payload.get("ingested_at")
+                },
+                default=default_json_transform,
+                ensure_ascii=False
+            )
+        )
+
+        # External Function 用の戻り値（中身は何でもOK）
+        response_rows.append([row_number, "logged"])
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(
+            {"data": response_rows},
+            default=default_json_transform
+        )
+    }
